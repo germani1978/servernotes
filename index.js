@@ -60,7 +60,7 @@ app.get('/info', (request, response) => {
     response.send(resp)
 })
 
-app.get('api/notes/:id', (request, response) => {
+app.get('/api/notes/:id', (request, response) => {
     const noteId = notes.filter(note => note.id === Number(request.params.id))
     noteId.length !== 0 ? response.send(noteId[0]) : response.sendStatus(404)
 })
