@@ -60,14 +60,20 @@ app.get('/info', (request, response) => {
     response.send(resp)
 })
 
-app.get('/persons/:id', (request, response) => {
+app.get('api/notes/:id', (request, response) => {
     const noteId = notes.filter(note => note.id === Number(request.params.id))
     noteId.length !== 0 ? response.send(noteId[0]) : response.sendStatus(404)
 })
 
+app.delete('/api/notes/:id', (request, response) => {
+    const id = Number(request.params.id)
+    notes = notes.filter(note => note.id !== id)
+    response.status(204).end()
+})
+
 app.use(express.json())
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/notes', (request, response) => {
     const contact = request.body
 
     if (!('name' in contact)) return response.status(404).send('missing name')
