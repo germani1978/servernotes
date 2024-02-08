@@ -2,13 +2,50 @@ const express = require('express')
 var logger = require('morgan')
 const cors = require('cors')
 require('dotenv').config()
-const Person = require('./models/person')
+// const Person = require('./models/person')
 
 const app = express()
 
 app.use(express.static('dist'))
 app.use(express.json())
 app.use(cors())
+
+//--------------------------------------------
+
+require('dotenv').config()
+
+const mongoose = require('mongoose')
+
+mongoose.set('strictQuery', false)
+
+const url = process.env.MONGODB_URI
+
+const connectDB = async () => {
+    try {
+        const conn = await mongoose.connect(url)
+        console.log(`MongoDB Connected: ${conn.connection.host}`)
+    } catch (error) {
+        console.log(error)
+        process.exit(1)
+    }
+}
+
+const personSchema = new mongoose.Schema({
+    name: String,
+    number: String
+})
+
+const Person = mongoose.model('Person', personSchema)
+
+personSchema.set('toJSON', {
+    transform: (document, returnedObject) => {
+        returnedObject.id = returnedObject._id.toString()
+        delete returnedObject._id
+        delete returnedObject.__v
+    }
+})
+
+//------------------------------------------------------------------------------
 
 logger.token('type', function (req, res) {
     return JSON.stringify(req.body)
@@ -105,8 +142,10 @@ app.put('/api/persons/:id', (request, response) => {
 
 const PORT = process.env.PORT || 3001
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`)
+    })
 })
 
 const errorHandler = (error, request, response, next) => {
