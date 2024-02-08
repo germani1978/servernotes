@@ -1,40 +1,21 @@
 const express = require('express')
-var morgan = require('morgan')
+var logger = require('morgan')
 const cors = require('cors')
+require('dotenv').config()
+const Person = require('./models/person')
+
 const app = express()
+
 app.use(express.static('dist'))
+app.use(express.json())
+app.use(cors())
 
-let notes = [
-    {
-        id: 1,
-        name: 'Arto Hellas',
-        number: '040-123456'
-    },
-    {
-        id: 2,
-        name: 'Ada Lovelace',
-        number: '39-44-5323523'
-    },
-    {
-        id: 3,
-        name: 'Dan Abramov',
-        number: '12-43-234345'
-    },
-    {
-        id: 4,
-        name: 'Mary Poppendieck',
-        number: '39-23-6423122'
-    }
-]
-
-morgan.token('type', function (req, res) {
+logger.token('type', function (req, res) {
     return JSON.stringify(req.body)
 })
 
-app.use(cors())
-
 app.use(
-    morgan(function (tokens, req, res) {
+    logger(function (tokens, req, res) {
         return [
             tokens.method(req, res),
             tokens.url(req, res),
@@ -48,32 +29,48 @@ app.use(
     })
 )
 
-app.get('/api/notes', (request, response) => {
-    response.json(notes)
+// ok mongo
+app.get('/api/persons', (request, response) => {
+    Person.find({}).then(result => {
+        response.json(result)
+    })
 })
 
+// ok mongo
 app.get('/info', (request, response) => {
-    const len = notes.length
-    const date = new Date()
-    const d = date.toUTCString()
-    const resp = `<div><p>phone has info for ${len} people</p><p>${d}<p/></div>`
-    response.send(resp)
+    Person.find({}).then(result => {
+        const len = result.length
+        const date = new Date()
+        const d = date.toUTCString()
+        const resp = `<div><p>phone has info for ${len} people</p><p>${d}<p/></div>`
+        response.send(resp)
+    })
 })
 
-app.get('/api/notes/:id', (request, response) => {
-    const noteId = notes.filter(note => note.id === Number(request.params.id))
-    noteId.length !== 0 ? response.send(noteId[0]) : response.sendStatus(404)
+//ok mongo
+app.get('/api/persons/:id', (request, response, next) => {
+    Person.findById(request.params.id)
+        .then(person => {
+            if (person) {
+                response.json(person)
+            } else {
+                response.status(404).end()
+            }
+        })
+        .catch(err => next(err))
 })
 
-app.delete('/api/notes/:id', (request, response) => {
-    const id = Number(request.params.id)
-    notes = notes.filter(note => note.id !== id)
-    response.status(204).end()
+// ok mongo
+app.delete('/api/persons/:id', (request, response, next) => {
+    Person.findByIdAndDelete(request.params.id)
+        .then(result => {
+            response.status(204).end()
+        })
+        .catch(err => next(err))
 })
 
-app.use(express.json())
-
-app.post('/api/notes', (request, response) => {
+//ok mongo
+app.post('/api/persons', (request, response) => {
     const contact = request.body
 
     if (!('name' in contact)) return response.status(404).send('missing name')
@@ -81,17 +78,29 @@ app.post('/api/notes', (request, response) => {
     if (!('number' in contact))
         return response.status(404).send('missing number')
 
-    const max = notes.length === 0 ? 0 : Math.max(...notes.map(note => note.id))
-
-    notes.push({
-        ...contact,
-        id: max + 1
+    const person = new Person({
+        name: contact.name,
+        number: contact.number
     })
 
-    response.json({
-        ...contact,
-        id: max + 1
+    person.save().then(savePerson => {
+        response.json(savePerson)
     })
+})
+
+app.put('/api/persons/:id', (request, response) => {
+    const { name, number, id } = request.body
+
+    const person = {
+        name: name,
+        number: number
+    }
+
+    Person.findByIdAndUpdate(id, person, { new: true })
+        .then(updateNote => {
+            response.json(updateNote)
+        })
+        .catch(err => next(err))
 })
 
 const PORT = process.env.PORT || 3001
@@ -99,3 +108,15 @@ const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
+
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    }
+
+    next(error)
+}
+
+app.use(errorHandler)
